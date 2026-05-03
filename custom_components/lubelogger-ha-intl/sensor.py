@@ -236,6 +236,10 @@ async def async_setup_entry(
             sensors.append(
                 LubeLoggerLatestEquipmentSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
             )
+        if vehicle.get("equipment_records") is not None:
+            sensors.append(
+                LubeLoggerEquipmentListSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
+            )
 
     async_add_entities(sensors)
 
@@ -1281,3 +1285,43 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
                 break
 
         return attrs
+
+class LubeLoggerEquipmentListSensor(BaseLubeLoggerSensor):
+    """Full equipment list per vehicle."""
+
+    def __init__(
+        self,
+        coordinator,
+        vehicle_id,
+        vehicle_name,
+        vehicle_info,
+    ) -> None:
+        super().__init__(
+            coordinator=coordinator,
+            vehicle_id=vehicle_id,
+            vehicle_name=vehicle_name,
+            vehicle_info=vehicle_info,
+            key="equipment_records",
+            translation_key="equipment_records",
+            unique_id_suffix="equipment_records",
+        )
+
+    @property
+    def native_value(self):
+        rec = self._record
+        if not rec:
+            return None
+
+        # Return count (useful for HA dashboards)
+        return len(rec)
+
+    @property
+    def extra_state_attributes(self):
+        rec = self._record
+        if not rec:
+            return None
+
+        return {
+            "count": len(rec),
+            "items": rec,
+        }
