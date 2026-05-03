@@ -168,6 +168,17 @@ class LubeLoggerDataUpdateCoordinator(DataUpdateCoordinator):
                 )
                 vehicle_data["next_reminder"] = None
 
+            # Latest equipment record for this vehicle
+            try:
+                vehicle_data["latest_equipment"] = await self.client.async_get_latest_equipment(
+                    vehicle_id
+                )
+            except Exception as err:
+                _LOGGER.warning(
+                    "Error fetching latest equipment for vehicle %s: %s", vehicle_id, err
+                )
+                vehicle_data["latest_equipment"] = None
+
             data["vehicles"].append(vehicle_data)
 
         return data
