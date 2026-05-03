@@ -1314,11 +1314,6 @@ class LubeLoggerEquipmentListSensor(BaseLubeLoggerSensor):
         )
 
     @property
-    def available(self) -> bool:
-        """Equipment list should be available as long as coordinator has data."""
-        return self.coordinator.last_update_success
-
-    @property
     def native_value(self) -> int:
         """Return total number of equipment entries."""
         data = self.coordinator.data or {}
@@ -1363,15 +1358,10 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
         self._vehicle_id = vehicle_id
         self._equipment = equipment
         self._equipment_id = equipment.get("id") or equipment.get("Id")
-        equipment_name = (
-            equipment.get("description")
-            or equipment.get("Description")
-            or equipment.get("name")
-            or equipment.get("Name")
-            or f"Equipment {self._equipment_id}"
-        )
+        equipment_name = equipment.get("name") or equipment.get("Name") or f"Equipment {self._equipment_id}"
 
         self._attr_unique_id = f"lubelogger_equipment_{vehicle_id}_{self._equipment_id}"
+        self._attr_translation_key = "equipment_item"
         self._attr_name = equipment_name
 
         make = vehicle_info.get("Make") or vehicle_info.get("make") or ""
@@ -1386,14 +1376,8 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> str:
-        return (
-            self._equipment.get("description")
-            or self._equipment.get("Description")
-            or self._equipment.get("name")
-            or self._equipment.get("Name")
-            or "No description"
-        )
+    def native_value(self) -> str | None:
+        return self._equipment.get("name") or self._equipment.get("Name")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
