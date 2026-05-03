@@ -31,7 +31,7 @@
       "latest_gas": { "name": "Last Refuel" },
       "latest_tax": { "name": "Latest Tax" },
       "next_plan": { "name": "Next Plan" },
-      "next_reminder": { "name": "Next Reminder" }
+      "next_reminder": { "name": "Next Reminder" },
       "latest_equipment": { "name": "Letztes Equipment" }
     }
   },
