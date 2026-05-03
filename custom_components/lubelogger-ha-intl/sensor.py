@@ -245,7 +245,7 @@ async def async_setup_entry(
 
         for equipment in equipment_list:
             sensors.append(
-                LubeLoggerEquipmentSensor(coordinator, vehicle_id, equipment)
+                LubeLoggerEquipmentSensor(coordinator, vehicle_id, vehicle_name, vehicle_info, equipment,)
             )
 
     async_add_entities(sensors)
