@@ -23,15 +23,39 @@
   },
   "entity": {
     "sensor": {
-      "latest_odometer": { "name": "Ultimo contachilometri" },
-      "latest_service": { "name": "Ultimo servizio" },
-      "latest_repair": { "name": "Ultima riparazione" },
-      "latest_upgrade": { "name": "Ultimo upgrade" },
-      "latest_supply": { "name": "Ultima fornitura" },
-      "latest_gas": { "name": "Ultimo rifornimento" },
-      "latest_tax": { "name": "Ultima tassa" },
-      "next_plan": { "name": "Prossimo piano" },
-      "next_reminder": { "name": "Prossimo promemoria" }
+      "latest_odometer": {
+        "name": "Ultimo contachilometri"
+      },
+      "latest_service": {
+        "name": "Ultimo servizio"
+      },
+      "latest_repair": {
+        "name": "Ultima riparazione"
+      },
+      "latest_upgrade": {
+        "name": "Ultimo upgrade"
+      },
+      "latest_supply": {
+        "name": "Ultima fornitura"
+      },
+      "latest_gas": {
+        "name": "Ultimo rifornimento"
+      },
+      "latest_tax": {
+        "name": "Ultima tassa"
+      },
+      "next_plan": {
+        "name": "Prossimo piano"
+      },
+      "next_reminder": {
+        "name": "Prossimo promemoria"
+      },
+      "latest_equipment": {
+        "name": "Ultima attrezzatura"
+      },
+      "equipment_list": {
+        "name": "Voci attrezzatura"
+      }
     }
   },
   "state_attributes": {
