@@ -27,5 +27,5 @@ API_UPGRADE_RECORD: Final = "/api/vehicle/upgraderecords"
 API_SUPPLY_RECORD: Final = "/api/vehicle/supplyrecords"
 API_GAS_RECORD: Final = "/api/vehicle/gasrecords"
 API_REMINDER: Final = "/api/vehicle/reminders"
-
+API_EQUIPMENT_RECORD: Final = "/api/vehicle/equipmentrecords"
 
