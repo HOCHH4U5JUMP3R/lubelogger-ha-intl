@@ -232,6 +232,10 @@ async def async_setup_entry(
             sensors.append(
                 LubeLoggerNextReminderSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
             )
+        if vehicle.get("latest_equipment"):
+            sensors.append(
+                LubeLoggerLatestEquipmentSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
+            )
 
     async_add_entities(sensors)
 
@@ -1215,4 +1219,65 @@ class LubeLoggerNextReminderSensor(BaseLubeLoggerSensor):
             if "{value}" in template and value is not None:
                 attrs["status"] = template.replace("{value}", str(value))
         
+        return attrs
+
+class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
+    """Sensor for latest equipment record."""
+
+    def __init__(
+        self,
+        coordinator: LubeLoggerDataUpdateCoordinator,
+        vehicle_id: int,
+        vehicle_name: str,
+        vehicle_info: dict,
+    ) -> None:
+        super().__init__(
+            coordinator=coordinator,
+            vehicle_id=vehicle_id,
+            vehicle_name=vehicle_name,
+            vehicle_info=vehicle_info,
+            key="latest_equipment",
+            translation_key="latest_equipment",
+            unique_id_suffix="latest_equipment",
+            device_class=SensorDeviceClass.TIMESTAMP,
+        )
+
+    @property
+    def native_value(self) -> datetime | None:
+        rec = self._record
+        if not rec:
+            return None
+
+        # Try common date fields (same pattern as others)
+        for field in ("date", "Date", "EquipmentDate"):
+            dt = parse_date(rec.get(field))
+            if dt:
+                return dt
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        if not self._record:
+            return None
+
+        attrs = {}
+
+        # Same normalization logic used everywhere else
+        for key, value in self._record.items():
+            if isinstance(value, str) and any(char.isdigit() for char in value):
+                attrs[key] = convert_number_string(value)
+            else:
+                attrs[key] = value
+
+        # Add formatted date
+        for field in ("date", "Date", "EquipmentDate"):
+            if field in attrs:
+                try:
+                    dt = parse_date(attrs[field])
+                    if dt:
+                        attrs["date_formatted"] = dt.strftime("%d/%m/%Y")
+                except (ValueError, TypeError):
+                    pass
+                break
+
         return attrs
