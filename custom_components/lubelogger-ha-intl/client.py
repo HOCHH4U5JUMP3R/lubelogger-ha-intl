@@ -21,6 +21,7 @@ from .const import (
     API_TAX,
     API_UPGRADE_RECORD,
     API_VEHICLES,
+    API_EQUIPMENT_RECORD,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -419,6 +420,38 @@ class LubeLoggerClient:
             return next_reminder
         
         return None
+
+    async def async_get_latest_equipment(
+        self, vehicle_id: int | None = None
+    ) -> dict[str, Any] | None:
+        """Get the latest equipment record for a vehicle."""
+        endpoint = f"{API_EQUIPMENT_RECORD}?vehicleId={vehicle_id}" if vehicle_id else API_EQUIPMENT_RECORD
+        records = await self._async_request(endpoint)
+        
+        if not isinstance(records, list) or not records:
+            _LOGGER.debug("No equipment records found for vehicle %s", vehicle_id)
+            return None
+
+        def sort_key(rec: dict[str, Any]) -> Any:
+            date_str = rec.get("date") or rec.get("Date") or rec.get("equipmentDate")
+            if date_str:
+                dt = parse_date_string(date_str)
+                if dt:
+                    return dt
+
+            rec_id = rec.get("id") or rec.get("Id")
+            if rec_id:
+                try:
+                    return int(rec_id)
+                except (ValueError, TypeError):
+                    return rec_id
+            return 0
+
+        sorted_records = sorted(records, key=sort_key)
+        latest = sorted_records[-1] if sorted_records else None
+
+        _LOGGER.debug("Latest equipment for vehicle %s: %s", vehicle_id, latest)
+        return latest
 
     async def _async_request(
         self, endpoint: str, method: str = "GET", **kwargs: Any
