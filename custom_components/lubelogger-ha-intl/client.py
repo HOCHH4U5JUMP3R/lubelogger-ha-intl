@@ -462,7 +462,7 @@ class LubeLoggerClient:
 
         if not isinstance(records, list) or not records:
             _LOGGER.debug("No equipment records found for vehicle %s", vehicle_id)
-            return None
+            return []
 
         return records
 
