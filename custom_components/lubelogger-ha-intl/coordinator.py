@@ -188,7 +188,7 @@ class LubeLoggerDataUpdateCoordinator(DataUpdateCoordinator):
                 )
                 equipment_records = []
 
-                vehicle_data["equipment_records"] = equipment_records
+            vehicle_data["equipment_records"] = equipment_records
 
             data["vehicles"].append(vehicle_data)
 
