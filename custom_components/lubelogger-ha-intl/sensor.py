@@ -1293,21 +1293,108 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
 
         return attrs
 
+class LubeLoggerEquipmentListSensor(BaseLubeLoggerSensor):
+    """Sensor exposing all equipment records as attributes."""
+
+    def __init__(
+        self,
+        coordinator: LubeLoggerDataUpdateCoordinator,
+        vehicle_id: int,
+        vehicle_name: str,
+        vehicle_info: dict,
+    ) -> None:
+        super().__init__(
+            coordinator=coordinator,
+            vehicle_id=vehicle_id,
+            vehicle_name=vehicle_name,
+            vehicle_info=vehicle_info,
+            key="latest_equipment",
+            translation_key="equipment_list",
+            unique_id_suffix="equipment_list",
+        )
+
+    @property
+    def available(self) -> bool:
+        """Equipment list should be available as long as coordinator has data."""
+        return self.coordinator.last_update_success
+
+    @property
+    def native_value(self) -> int:
+        """Return total number of equipment entries."""
+        data = self.coordinator.data or {}
+        vehicles = data.get("vehicles", [])
+        for vehicle in vehicles:
+            if vehicle.get("id") == self._vehicle_id:
+                equipment_records = vehicle.get("equipment_records") or []
+                return len(equipment_records)
+        return 0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return all equipment entries."""
+        data = self.coordinator.data or {}
+        vehicles = data.get("vehicles", [])
+        for vehicle in vehicles:
+            if vehicle.get("id") == self._vehicle_id:
+                equipment_records = vehicle.get("equipment_records") or []
+                return {
+                    "equipment_entries": equipment_records,
+                    "vehicle_id": self._vehicle_id,
+                }
+
+        return {"equipment_entries": [], "vehicle_id": self._vehicle_id}
+
+
 class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
-    def __init__(self, coordinator, vehicle_id, equipment):
+    """Entity for a single equipment item."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: LubeLoggerDataUpdateCoordinator,
+        vehicle_id: int,
+        vehicle_name: str,
+        vehicle_info: dict,
+        equipment: dict[str, Any],
+    ) -> None:
         super().__init__(coordinator)
-    
+
         self._vehicle_id = vehicle_id
         self._equipment = equipment
-        self._equipment_id = equipment.get("id")
-    
+        self._equipment_id = equipment.get("id") or equipment.get("Id")
+        equipment_name = (
+            equipment.get("description")
+            or equipment.get("Description")
+            or equipment.get("name")
+            or equipment.get("Name")
+            or f"Equipment {self._equipment_id}"
+        )
+
         self._attr_unique_id = f"lubelogger_equipment_{vehicle_id}_{self._equipment_id}"
-        self._attr_name = equipment.get("name") or equipment.get("Name")
+        self._attr_name = equipment_name
+
+        make = vehicle_info.get("Make") or vehicle_info.get("make") or ""
+        model = vehicle_info.get("Model") or vehicle_info.get("model") or ""
+        year = str(vehicle_info.get("Year") or vehicle_info.get("year") or "")
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, str(vehicle_id))},
+            name=vehicle_name,
+            manufacturer=make or "LubeLogger",
+            model=model or vehicle_name,
+            sw_version=year,
+        )
 
     @property
-    def native_value(self):
-        return self._equipment.get("name")
+    def native_value(self) -> str:
+        return (
+            self._equipment.get("description")
+            or self._equipment.get("Description")
+            or self._equipment.get("name")
+            or self._equipment.get("Name")
+            or "No description"
+        )
 
     @property
-    def extra_state_attributes(self):
+    def extra_state_attributes(self) -> dict[str, Any]:
         return self._equipment
