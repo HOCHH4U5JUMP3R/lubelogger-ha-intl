@@ -179,6 +179,31 @@ class LubeLoggerDataUpdateCoordinator(DataUpdateCoordinator):
                 )
                 vehicle_data["latest_equipment"] = None
 
+            # All equipment record for this vehicle
+            try:
+                vehicle_data["equipment_records"] = await self.client.async_get_equipment_records(
+                    vehicle_id
+                )
+            except Exception as err:
+                _LOGGER.warning(
+                    "Error fetching equipment for vehicle %s: %s", vehicle_id, err,
+                )
+                vehicle_data["equipment_records"] = []
+
+                normalized_equipment = []
+
+                for eq in equipment_records:
+                    normalized_equipment.append({
+                        "id": eq.get("Id") or eq.get("id"),
+                        "name": eq.get("Name") or eq.get("name"),
+                        "type": eq.get("Type") or eq.get("type"),
+                        "date": eq.get("date") or eq.get("Date"),
+                        "cost": convert_number_string(eq.get("cost")),
+                        "raw": eq,
+                    })
+
+                vehicle_data["equipment_records"] = normalized_equipment
+
             data["vehicles"].append(vehicle_data)
 
         return data
