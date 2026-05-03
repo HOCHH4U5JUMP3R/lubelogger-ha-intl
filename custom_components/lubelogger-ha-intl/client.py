@@ -453,6 +453,16 @@ class LubeLoggerClient:
         _LOGGER.debug("Latest equipment for vehicle %s: %s", vehicle_id, latest)
         return latest
 
+    async def async_get_equipment_records(self, vehicle_id: int) -> list[dict[str, Any]]:
+    """Get all equipment records for a vehicle."""
+    endpoint = f"/EquipmentRecord?vehicleId={vehicle_id}"
+    records = await self._async_request(endpoint)
+
+    if not isinstance(records, list):
+        return []
+
+    return records
+
     async def _async_request(
         self, endpoint: str, method: str = "GET", **kwargs: Any
     ) -> Any:
