@@ -1286,42 +1286,21 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
 
         return attrs
 
-class LubeLoggerEquipmentListSensor(BaseLubeLoggerSensor):
-    """Full equipment list per vehicle."""
-
-    def __init__(
-        self,
-        coordinator,
-        vehicle_id,
-        vehicle_name,
-        vehicle_info,
-    ) -> None:
-        super().__init__(
-            coordinator=coordinator,
-            vehicle_id=vehicle_id,
-            vehicle_name=vehicle_name,
-            vehicle_info=vehicle_info,
-            key="equipment_records",
-            translation_key="equipment_records",
-            unique_id_suffix="equipment_records",
-        )
+class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
+    def __init__(self, coordinator, vehicle_id, equipment):
+        super().__init__(coordinator)
+    
+        self._vehicle_id = vehicle_id
+        self._equipment = equipment
+        self._equipment_id = equipment.get("id")
+    
+        self._attr_unique_id = f"lubelogger_equipment_{vehicle_id}_{self._equipment_id}"
+        self._attr_name = equipment.get("name") or equipment.get("Name")
 
     @property
     def native_value(self):
-        rec = self._record
-        if not rec:
-            return None
-
-        # Return count (useful for HA dashboards)
-        return len(rec)
+        return self._equipment.get("name")
 
     @property
     def extra_state_attributes(self):
-        rec = self._record
-        if not rec:
-            return None
-
-        return {
-            "count": len(rec),
-            "items": rec,
-        }
+        return self._equipment
