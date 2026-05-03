@@ -1,0 +1,65 @@
+{
+  "title": "LubeLogger",
+  "config": {
+    "step": {
+      "user": {
+        "title": "LubeLogger Konfigurieren",
+        "description": "API-Schlüssel",
+        "data": {
+          "url": "API URL",
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "Already configured"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "latest_odometer": { "name": "Aktueller Kilometerstand" },
+      "latest_service": { "name": "Letzter Service" },
+      "latest_repair": { "name": "Letze Reparatur" },
+      "latest_upgrade": { "name": "Last Upgrade" },
+      "latest_supply": { "name": "Last Supply" },
+      "latest_gas": { "name": "Last Refuel" },
+      "latest_tax": { "name": "Latest Tax" },
+      "next_plan": { "name": "Next Plan" },
+      "next_reminder": { "name": "Next Reminder" }
+      "latest_equipment": { "name": "Letztes Equipment" }
+    }
+  },
+  "state_attributes": {
+    "sensor": {
+      "next_reminder": {
+        "and_conjunction": " und ",
+        "urgency": {
+          "NotUrgent": "Not urgent",
+          "Urgent": "Urgent",
+          "PastDue": "Past due"
+        },
+        "reminder_type": {
+          "By time": "nach Zeit",
+          "By distance": "nach Distanz",
+          "Both": "Beides",
+          "Mixed": "Gemischt"
+        },
+        "status": {
+          "overdue_distance": "Overdue by {value} km",
+          "overdue_days": "Overdue by {value} days",
+          "future_distance": "in {value} km",
+          "future_days": "in {value} Tage(n)",
+          "due_today": "Heute fällig",
+          "due_now": "Jetzt fällig",
+          "generic": "Unbekannter Status"
+        }
+      }
+    }
+  }
+}
