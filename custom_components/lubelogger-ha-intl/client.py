@@ -453,13 +453,16 @@ class LubeLoggerClient:
         _LOGGER.debug("Latest equipment for vehicle %s: %s", vehicle_id, latest)
         return latest
 
-    async def async_get_equipment_records(self, vehicle_id: int) -> list[dict[str, Any]]:
+    async def async_get_equipment_records(
+        self, vehicle_id: int
+    ) -> list[dict[str, Any]]:
     """Get all equipment records for a vehicle."""
-    endpoint = f"/EquipmentRecord?vehicleId={vehicle_id}"
+    endpoint = f"{API_EQUIPMENT_RECORD}?vehicleId={vehicle_id}" if vehicle_id else API_EQUIPMENT_RECORD
     records = await self._async_request(endpoint)
 
-    if not isinstance(records, list):
-        return []
+    if not isinstance(records, list) or not records:
+        _LOGGER.debug("No equipment records found for vehicle %s", vehicle_id)
+        return None
 
     return records
 
