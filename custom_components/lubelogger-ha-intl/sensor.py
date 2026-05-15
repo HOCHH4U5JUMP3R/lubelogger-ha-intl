@@ -247,6 +247,12 @@ def _to_float(value: Any) -> float | None:
         try:
             return float(value.replace(",", "."))
         except (ValueError, TypeError):
+            # Fallback: extract first numeric token from strings like "123 km"
+            match = re.search(r"[-+]?\d[\d.,]*", value)
+            if match:
+                converted = convert_number_string(match.group(0))
+                if isinstance(converted, (int, float)):
+                    return float(converted)
             return None
     return None
 
@@ -569,13 +575,17 @@ class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
                 total_distance = 0.0
                 found_distance = False
                 for record in vehicle.get("odometer_records") or []:
-                    distance_value = _get_record_value(record, "distance", "Distance")
-                    distance_num = _to_float(distance_value)
+                    distance_num = self._get_distance_from_odometer_record(record)
                     if distance_num is not None:
                         total_distance += distance_num
                         found_distance = True
                 if found_distance:
                     value = round(total_distance)
+                else:
+                    _LOGGER.debug(
+                        "No usable distance values found in odometer records for vehicle %s",
+                        self._vehicle_id,
+                    )
             if self._attr_native_unit_of_measurement == "km/l":
                 num = _to_float(value)
                 if num and num > 0:
@@ -583,6 +593,35 @@ class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
                 return None
             num = _to_float(value)
             return num if num is not None else value
+        return None
+
+    @staticmethod
+    def _get_distance_from_odometer_record(record: dict[str, Any]) -> float | None:
+        """Return distance value from an odometer record."""
+        distance_value = _get_record_value(
+            record,
+            "distance",
+            "Distance",
+            "tripDistance",
+            "TripDistance",
+        )
+        distance_num = _to_float(distance_value)
+        if distance_num is not None:
+            return distance_num
+
+        # Fallback: compute from odometer deltas when direct distance is absent
+        odo = _to_float(_get_record_value(record, "odometer", "Odometer"))
+        initial = _to_float(
+            _get_record_value(
+                record,
+                "initialOdometer",
+                "InitialOdometer",
+                "initialMileage",
+                "InitialMileage",
+            )
+        )
+        if odo is not None and initial is not None:
+            return odo - initial
         return None
 
 
