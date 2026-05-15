@@ -21,6 +21,7 @@ from .const import (
     API_TAX,
     API_UPGRADE_RECORD,
     API_VEHICLES,
+    API_VEHICLE_INFO,
     API_EQUIPMENT_RECORD,
 )
 
@@ -187,6 +188,18 @@ class LubeLoggerClient:
         if not isinstance(vehicles, list):
             return []
         return vehicles
+
+    async def async_get_vehicle_info(
+        self, vehicle_id: int | None = None
+    ) -> dict[str, Any] | None:
+        """Get vehicle info payload for a vehicle."""
+        if vehicle_id is None:
+            return None
+        endpoint = f"{API_VEHICLE_INFO}?vehicleId={vehicle_id}"
+        info = await self._async_request(endpoint)
+        if isinstance(info, dict):
+            return info
+        return None
 
     async def async_get_latest_odometer(
         self, vehicle_id: int | None = None

@@ -302,6 +302,7 @@ async def async_setup_entry(
             sensors.append(
                 LubeLoggerLatestGasSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
             )
+        if vehicle_info:
             sensors.extend(
                 [
                     LubeLoggerVehicleAggregateSensor(
