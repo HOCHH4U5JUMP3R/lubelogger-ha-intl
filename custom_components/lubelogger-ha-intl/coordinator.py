@@ -180,6 +180,45 @@ class LubeLoggerDataUpdateCoordinator(DataUpdateCoordinator):
                 )
                 vehicle_data["latest_gas"] = None
 
+            # Full gas records for aggregate fallbacks
+            try:
+                vehicle_data["gas_records"] = await self.client.async_get_gas_records(vehicle_id)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Error fetching gas records for vehicle %s: %s", vehicle_id, err
+                )
+                vehicle_data["gas_records"] = []
+
+            # Full maintenance records for aggregate fallbacks
+            try:
+                vehicle_data["service_records"] = await self.client.async_get_service_records(vehicle_id)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Error fetching service records for vehicle %s: %s", vehicle_id, err
+                )
+                vehicle_data["service_records"] = []
+            try:
+                vehicle_data["repair_records"] = await self.client.async_get_repair_records(vehicle_id)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Error fetching repair records for vehicle %s: %s", vehicle_id, err
+                )
+                vehicle_data["repair_records"] = []
+            try:
+                vehicle_data["upgrade_records"] = await self.client.async_get_upgrade_records(vehicle_id)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Error fetching upgrade records for vehicle %s: %s", vehicle_id, err
+                )
+                vehicle_data["upgrade_records"] = []
+            try:
+                vehicle_data["supply_records"] = await self.client.async_get_supply_records(vehicle_id)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Error fetching supply records for vehicle %s: %s", vehicle_id, err
+                )
+                vehicle_data["supply_records"] = []
+
             # Next reminder for this vehicle
             try:
                 vehicle_data["next_reminder"] = await self.client.async_get_next_reminder(
