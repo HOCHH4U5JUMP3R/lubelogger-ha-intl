@@ -50,7 +50,7 @@ def parse_date(date_str: str | None) -> datetime | None:
         "%m/%d/%Y",           # US format (fallback)
         "%m/%d/%Y %H:%M:%S",  # US format with time (fallback)
         "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S.%f",
         "%Y-%m-%d %H:%M:%S",
         "%Y-%m-%d",
     ]
@@ -145,6 +145,24 @@ def convert_number_string(number_str: Any) -> float | int | str | None:
             return original.strip()
     
     return number_str
+
+
+def _should_convert_numeric_string(value: Any) -> bool:
+    """Return True when a value is likely numeric (and not a date/time)."""
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text:
+        return False
+
+    # Avoid converting date/time-like values
+    if parse_date(text) is not None:
+        return False
+    if re.search(r"\d{1,2}[./-]\d{1,2}[./-]\d{2,4}", text):
+        return False
+
+    # Numeric-like pattern with optional sign/separators/currency
+    return bool(re.fullmatch(r"[€$£]?\s*[-+]?\d[\d.,\s]*", text))
 
 
 def convert_fuel_consumption(value: Any) -> float | str:
@@ -455,7 +473,7 @@ class LubeLoggerLatestOdometerSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -522,7 +540,7 @@ class LubeLoggerNextPlanSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -585,7 +603,7 @@ class LubeLoggerLatestTaxSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -647,7 +665,7 @@ class LubeLoggerLatestServiceSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -709,7 +727,7 @@ class LubeLoggerLatestRepairSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -771,7 +789,7 @@ class LubeLoggerLatestUpgradeSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -833,7 +851,7 @@ class LubeLoggerLatestSupplySensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -895,7 +913,7 @@ class LubeLoggerLatestGasSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -999,7 +1017,7 @@ class LubeLoggerNextReminderSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -1296,7 +1314,7 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
 
         # Same normalization logic used everywhere else
         for key, value in self._record.items():
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -1402,10 +1420,32 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
         value = self._equipment.get("isactive")
         if value is None:
             value = self._equipment.get("IsActive")
+        if value is None:
+            value = self._equipment.get("active")
+        if value is None:
+            value = self._equipment.get("Active")
+
+        # Some payloads provide dynamic name/value pairs
+        if value is None:
+            for key in ("fields", "Fields", "values", "Values", "attributes", "Attributes"):
+                items = self._equipment.get(key)
+                if isinstance(items, list):
+                    for item in items:
+                        if not isinstance(item, dict):
+                            continue
+                        item_name = str(item.get("name") or item.get("Name") or "").strip().lower()
+                        if item_name == "active":
+                            value = item.get("value") or item.get("Value")
+                            break
+                    if value is not None:
+                        break
+
         if isinstance(value, bool):
             return value
+        if isinstance(value, (int, float)):
+            return bool(value)
         if isinstance(value, str):
-            return value.lower() in ("true", "1", "yes")
+            return value.strip().lower() in ("true", "1", "yes", "on")
         return None
 
     @property
