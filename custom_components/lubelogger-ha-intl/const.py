@@ -15,6 +15,7 @@ DEFAULT_UPDATE_INTERVAL: Final = 300  # 5 minutes
 # See https://docs.lubelogger.com/Advanced/API for details.
 API_ROOT: Final = "/api"
 API_VEHICLES: Final = "/api/vehicles"
+API_VEHICLE_INFO: Final = "/api/vehicle/info"
 
 # Vehicle-scoped endpoints
 API_ODOMETER: Final = "/api/vehicle/odometerrecords"
@@ -28,4 +29,3 @@ API_SUPPLY_RECORD: Final = "/api/vehicle/supplyrecords"
 API_GAS_RECORD: Final = "/api/vehicle/gasrecords"
 API_REMINDER: Final = "/api/vehicle/reminders"
 API_EQUIPMENT_RECORD: Final = "/api/vehicle/equipmentrecords"
-

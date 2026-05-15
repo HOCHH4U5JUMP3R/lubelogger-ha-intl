@@ -75,6 +75,18 @@ class LubeLoggerDataUpdateCoordinator(DataUpdateCoordinator):
                 "vehicle_info": vehicle,
             }
 
+            # Vehicle info (includes aggregate fields from /api/vehicle/info)
+            try:
+                vehicle_info = await self.client.async_get_vehicle_info(vehicle_id)
+                if vehicle_info:
+                    merged_info = dict(vehicle)
+                    merged_info.update(vehicle_info)
+                    vehicle_data["vehicle_info"] = merged_info
+            except Exception as err:
+                _LOGGER.warning(
+                    "Error fetching vehicle info for vehicle %s: %s", vehicle_id, err
+                )
+
             # Latest odometer for this vehicle
             try:
                 vehicle_data["latest_odometer"] = await self.client.async_get_latest_odometer(

@@ -302,32 +302,33 @@ async def async_setup_entry(
             sensors.append(
                 LubeLoggerLatestGasSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
             )
+        if vehicle_info:
             sensors.extend(
                 [
                     LubeLoggerVehicleAggregateSensor(
                         coordinator, vehicle_id, vehicle_name, vehicle_info,
                         "Total Distance", "total_distance", "km",
-                        ("totalDistance", "TotalDistance", "distanceTotal", "DistanceTotal", "odometer"),
+                        ("TotalDistanceTraveled", "totalDistanceTraveled", "totalDistance", "TotalDistance", "distanceTotal", "DistanceTotal", "odometer"),
                     ),
                     LubeLoggerVehicleAggregateSensor(
                         coordinator, vehicle_id, vehicle_name, vehicle_info,
                         "Total Fuel", "total_fuel", "L",
-                        ("totalFuel", "TotalFuel", "fuelTotal", "FuelTotal", "totalLiters", "TotalLiters"),
+                        ("TotalFuelConsumed", "totalFuelConsumed", "totalFuel", "TotalFuel", "fuelTotal", "FuelTotal", "totalLiters", "TotalLiters"),
                     ),
                     LubeLoggerVehicleAggregateSensor(
                         coordinator, vehicle_id, vehicle_name, vehicle_info,
                         "Total Fuel Cost", "total_fuel_cost", "EUR",
-                        ("totalFuelCost", "TotalFuelCost", "fuelCostTotal", "FuelCostTotal"),
+                        ("TotalFuelCost", "totalFuelCost", "fuelCostTotal", "FuelCostTotal"),
                     ),
                     LubeLoggerVehicleAggregateSensor(
                         coordinator, vehicle_id, vehicle_name, vehicle_info,
                         "Total Average Fuel Economy", "total_average_fuel_economy", "km/l",
-                        ("averageFuelEconomy", "AverageFuelEconomy", "avgFuelEconomy", "AvgFuelEconomy", "averageConsumption", "AverageConsumption"),
+                        ("AverageFuelEconomy", "averageFuelEconomy", "avgFuelEconomy", "AvgFuelEconomy", "averageConsumption", "AverageConsumption"),
                     ),
                     LubeLoggerVehicleAggregateSensor(
                         coordinator, vehicle_id, vehicle_name, vehicle_info,
                         "Total Service Cost", "total_service_cost", "EUR",
-                        ("totalServiceCost", "TotalServiceCost", "maintenanceCostTotal", "MaintenanceCostTotal"),
+                        ("MaintenanceTotalCost", "maintenanceTotalCost", "totalServiceCost", "TotalServiceCost", "maintenanceCostTotal", "MaintenanceCostTotal"),
                     ),
                 ]
             )
