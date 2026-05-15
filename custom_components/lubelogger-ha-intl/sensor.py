@@ -1417,22 +1417,6 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
     def native_value(self) -> bool | None:
         value = _get_record_value(self._equipment, "isactive", "IsActive", "active", "Active")
 
-        # Some payloads provide single key/value with name metadata
-        if value is None:
-            item_name = str(
-                self._equipment.get("name")
-                or self._equipment.get("Name")
-                or self._equipment.get("-name")
-                or self._equipment.get("_name")
-                or ""
-            ).strip().lower()
-            if item_name == "active":
-                value = (
-                    self._equipment.get("value")
-                    or self._equipment.get("Value")
-                    or self._equipment.get("-value")
-                )
-
         # Some payloads provide dynamic name/value pairs
         if value is None:
             for key in ("fields", "Fields", "values", "Values", "attributes", "Attributes"):
