@@ -189,6 +189,21 @@ def _get_record_datetime(record: dict[str, Any], fields: tuple[str, ...]) -> dat
     return None
 
 
+def _get_extra_field_value(record: dict[str, Any], field_name: str) -> Any:
+    """Return value from ExtraFields-style arrays by field name."""
+    for container_key in ("ExtraFields", "extraFields", "extrafields"):
+        items = record.get(container_key)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or item.get("Name") or "").strip().lower()
+            if name == field_name.strip().lower():
+                return item.get("value") or item.get("Value")
+    return None
+
+
 def convert_fuel_consumption(value: Any) -> float | str:
     """Convert fuel consumption from l/100km to km/l with 2 decimals."""
     if value is None or value == "":
@@ -1301,6 +1316,11 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
+        purchase_date = _get_extra_field_value(rec, "PurchaseDate")
+        dt = parse_date(purchase_date)
+        if dt:
+            return dt
+
         return _get_record_datetime(rec, ("date", "Date", "equipmentDate", "EquipmentDate"))
 
     @property
@@ -1416,6 +1436,25 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self) -> bool | None:
         value = _get_record_value(self._equipment, "isactive", "IsActive", "active", "Active")
+
+        if value is None:
+            value = _get_extra_field_value(self._equipment, "Active")
+
+        # Some payloads provide single key/value with name metadata
+        if value is None:
+            item_name = str(
+                self._equipment.get("name")
+                or self._equipment.get("Name")
+                or self._equipment.get("-name")
+                or self._equipment.get("_name")
+                or ""
+            ).strip().lower()
+            if item_name == "active":
+                value = (
+                    self._equipment.get("value")
+                    or self._equipment.get("Value")
+                    or self._equipment.get("-value")
+                )
 
         # Some payloads provide dynamic name/value pairs
         if value is None:
