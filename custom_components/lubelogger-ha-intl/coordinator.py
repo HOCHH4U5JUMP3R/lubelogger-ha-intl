@@ -86,6 +86,17 @@ class LubeLoggerDataUpdateCoordinator(DataUpdateCoordinator):
                 )
                 vehicle_data["latest_odometer"] = None
 
+            # Full odometer history for this vehicle
+            try:
+                vehicle_data["odometer_records"] = await self.client.async_get_odometer_records(
+                    vehicle_id
+                )
+            except Exception as err:
+                _LOGGER.warning(
+                    "Error fetching odometer records for vehicle %s: %s", vehicle_id, err
+                )
+                vehicle_data["odometer_records"] = []
+
             # Next planned item for this vehicle
             try:
                 vehicle_data["next_plan"] = await self.client.async_get_next_plan(vehicle_id)
@@ -193,4 +204,3 @@ class LubeLoggerDataUpdateCoordinator(DataUpdateCoordinator):
             data["vehicles"].append(vehicle_data)
 
         return data
-

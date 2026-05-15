@@ -45,12 +45,14 @@ def parse_date(date_str: str | None) -> datetime | None:
 
     # US and EU date and time format
     formats = [
+        "%d.%m.%Y",           # EU dotted format: "18.03.2026"
+        "%d.%m.%Y %H:%M:%S",  # EU dotted format with time
         "%d/%m/%Y",           # EU format: "28/02/2027"
         "%d/%m/%Y %H:%M:%S",  # EU format with time
         "%m/%d/%Y",           # US format (fallback)
         "%m/%d/%Y %H:%M:%S",  # US format with time (fallback)
         "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S.%f",
         "%Y-%m-%d %H:%M:%S",
         "%Y-%m-%d",
     ]
@@ -145,6 +147,61 @@ def convert_number_string(number_str: Any) -> float | int | str | None:
             return original.strip()
     
     return number_str
+
+
+def _should_convert_numeric_string(value: Any) -> bool:
+    """Return True when a value is likely numeric (and not a date/time)."""
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text:
+        return False
+
+    # Avoid converting date/time-like values
+    if parse_date(text) is not None:
+        return False
+    if re.search(r"\d{1,2}[./-]\d{1,2}[./-]\d{2,4}", text):
+        return False
+
+    # Numeric-like pattern with optional sign/separators/currency
+    return bool(re.fullmatch(r"[€$£]?\s*[-+]?\d[\d.,\s]*", text))
+
+
+def _get_record_value(record: dict[str, Any], *keys: str) -> Any:
+    """Get value by trying exact keys and then case-insensitive key matching."""
+    for key in keys:
+        if key in record:
+            return record.get(key)
+    lowered = {str(k).lower(): v for k, v in record.items()}
+    for key in keys:
+        value = lowered.get(key.lower())
+        if value is not None:
+            return value
+    return None
+
+
+def _get_record_datetime(record: dict[str, Any], fields: tuple[str, ...]) -> datetime | None:
+    """Return first parseable datetime from candidate fields."""
+    for field in fields:
+        dt = parse_date(_get_record_value(record, field))
+        if dt:
+            return dt
+    return None
+
+
+def _get_extra_field_value(record: dict[str, Any], field_name: str) -> Any:
+    """Return value from ExtraFields-style arrays by field name."""
+    for container_key in ("ExtraFields", "extraFields", "extrafields"):
+        items = record.get(container_key)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or item.get("Name") or "").strip().lower()
+            if name == field_name.strip().lower():
+                return item.get("value") or item.get("Value")
+    return None
 
 
 def convert_fuel_consumption(value: Any) -> float | str:
@@ -242,10 +299,23 @@ async def async_setup_entry(
             )
 
         equipment_list = vehicle.get("equipment_records", [])
+        equipment_name_counts: dict[str, int] = {}
 
         for equipment in equipment_list:
+            base_name = (
+                equipment.get("description")
+                or equipment.get("Description")
+                or equipment.get("name")
+                or equipment.get("Name")
+                or f"Equipment {equipment.get('id') or equipment.get('Id') or 'unknown'}"
+            )
+            count = equipment_name_counts.get(base_name, 0) + 1
+            equipment_name_counts[base_name] = count
+            display_name = f"{base_name} {count}" if count > 1 else base_name
             sensors.append(
-                LubeLoggerEquipmentSensor(coordinator, vehicle_id, vehicle_name, vehicle_info, equipment,)
+                LubeLoggerEquipmentSensor(
+                    coordinator, vehicle_id, vehicle_name, vehicle_info, equipment, display_name
+                )
             )
 
     async_add_entities(sensors)
@@ -442,7 +512,7 @@ class LubeLoggerLatestOdometerSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -455,6 +525,14 @@ class LubeLoggerLatestOdometerSensor(BaseLubeLoggerSensor):
                     attrs["date_formatted"] = dt.strftime("%d/%m/%Y")
             except (ValueError, TypeError):
                 pass
+
+        # Include complete odometer history for HA post-hoc history alignment
+        data = self.coordinator.data or {}
+        vehicles = data.get("vehicles", [])
+        for vehicle in vehicles:
+            if vehicle.get("id") == self._vehicle_id:
+                attrs["odometer_history"] = vehicle.get("odometer_records") or []
+                break
         
         return attrs
 
@@ -501,7 +579,7 @@ class LubeLoggerNextPlanSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -564,7 +642,7 @@ class LubeLoggerLatestTaxSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -610,12 +688,7 @@ class LubeLoggerLatestServiceSensor(BaseLubeLoggerSensor):
         rec = self._record
         if not rec:
             return None
-
-        for field in ("date", "Date", "ServiceDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "serviceDate", "ServiceDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -626,13 +699,13 @@ class LubeLoggerLatestServiceSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
         
         # Add date in readable format
-        date_fields = ["date", "Date", "ServiceDate"]
+        date_fields = ["date", "Date", "serviceDate", "ServiceDate"]
         for field in date_fields:
             if field in attrs:
                 try:
@@ -673,11 +746,7 @@ class LubeLoggerLatestRepairSensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        for field in ("date", "Date", "RepairDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "repairDate", "RepairDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -688,13 +757,13 @@ class LubeLoggerLatestRepairSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
         
         # Add date in readable format
-        date_fields = ["date", "Date", "RepairDate"]
+        date_fields = ["date", "Date", "repairDate", "RepairDate"]
         for field in date_fields:
             if field in attrs:
                 try:
@@ -735,11 +804,7 @@ class LubeLoggerLatestUpgradeSensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        for field in ("date", "Date", "UpgradeDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "upgradeDate", "UpgradeDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -750,13 +815,13 @@ class LubeLoggerLatestUpgradeSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
         
         # Add date in readable format
-        date_fields = ["date", "Date", "UpgradeDate"]
+        date_fields = ["date", "Date", "upgradeDate", "UpgradeDate"]
         for field in date_fields:
             if field in attrs:
                 try:
@@ -797,11 +862,7 @@ class LubeLoggerLatestSupplySensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        for field in ("date", "Date", "SupplyDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "supplyDate", "SupplyDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -812,13 +873,13 @@ class LubeLoggerLatestSupplySensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
         
         # Add date in readable format
-        date_fields = ["date", "Date", "SupplyDate"]
+        date_fields = ["date", "Date", "supplyDate", "SupplyDate"]
         for field in date_fields:
             if field in attrs:
                 try:
@@ -859,11 +920,7 @@ class LubeLoggerLatestGasSensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        for field in ("date", "Date", "FuelDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "fuelDate", "FuelDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -874,7 +931,7 @@ class LubeLoggerLatestGasSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -978,7 +1035,7 @@ class LubeLoggerNextReminderSensor(BaseLubeLoggerSensor):
         # Process ALL fields in the record to make them interoperable
         for key, value in self._record.items():
             # Convert any value that looks like a number
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
@@ -1259,12 +1316,12 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        # Try common date fields (same pattern as others)
-        for field in ("date", "Date", "EquipmentDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        purchase_date = _get_extra_field_value(rec, "PurchaseDate")
+        dt = parse_date(purchase_date)
+        if dt:
+            return dt
+
+        return _get_record_datetime(rec, ("date", "Date", "equipmentDate", "EquipmentDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -1275,13 +1332,13 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
 
         # Same normalization logic used everywhere else
         for key, value in self._record.items():
-            if isinstance(value, str) and any(char.isdigit() for char in value):
+            if _should_convert_numeric_string(value):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
 
         # Add formatted date
-        for field in ("date", "Date", "EquipmentDate"):
+        for field in ("date", "Date", "equipmentDate", "EquipmentDate"):
             if field in attrs:
                 try:
                     dt = parse_date(attrs[field])
@@ -1352,13 +1409,14 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
         vehicle_name: str,
         vehicle_info: dict,
         equipment: dict[str, Any],
+        display_name: str,
     ) -> None:
         super().__init__(coordinator)
 
         self._vehicle_id = vehicle_id
         self._equipment = equipment
         self._equipment_id = equipment.get("id") or equipment.get("Id")
-        equipment_name = equipment.get("name") or equipment.get("Name") or f"Equipment {self._equipment_id}"
+        equipment_name = display_name
 
         self._attr_unique_id = f"lubelogger_equipment_{vehicle_id}_{self._equipment_id}"
         self._attr_translation_key = "equipment_item"
@@ -1376,8 +1434,56 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> str | None:
-        return self._equipment.get("name") or self._equipment.get("Name")
+    def native_value(self) -> bool | None:
+        value = _get_record_value(self._equipment, "isactive", "IsActive", "active", "Active")
+
+        if value is None:
+            value = _get_extra_field_value(self._equipment, "Active")
+
+        # Some payloads provide single key/value with name metadata
+        if value is None:
+            item_name = str(
+                self._equipment.get("name")
+                or self._equipment.get("Name")
+                or self._equipment.get("-name")
+                or self._equipment.get("_name")
+                or ""
+            ).strip().lower()
+            if item_name == "active":
+                value = (
+                    self._equipment.get("value")
+                    or self._equipment.get("Value")
+                    or self._equipment.get("-value")
+                )
+
+        # Some payloads provide dynamic name/value pairs
+        if value is None:
+            for key in ("fields", "Fields", "values", "Values", "attributes", "Attributes"):
+                items = self._equipment.get(key)
+                if isinstance(items, list):
+                    for item in items:
+                        if not isinstance(item, dict):
+                            continue
+                        item_name = str(
+                            item.get("name")
+                            or item.get("Name")
+                            or item.get("-name")
+                            or item.get("_name")
+                            or ""
+                        ).strip().lower()
+                        if item_name == "active":
+                            value = item.get("value") or item.get("Value") or item.get("-value")
+                            break
+                    if value is not None:
+                        break
+
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            return value.strip().lower() in ("true", "1", "yes", "on")
+        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
