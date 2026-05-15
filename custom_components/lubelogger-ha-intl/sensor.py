@@ -328,7 +328,7 @@ async def async_setup_entry(
                     ),
                     LubeLoggerVehicleAggregateSensor(
                         coordinator, vehicle_id, vehicle_name, vehicle_info,
-                        "Total Average Fuel Economy", "total_average_fuel_economy", "l/km",
+                        "Total Average Fuel Economy", "total_average_fuel_economy", "km/l",
                         ("AverageFuelEconomy", "averageFuelEconomy", "avgFuelEconomy", "AvgFuelEconomy", "averageConsumption", "AverageConsumption"),
                     ),
                     LubeLoggerVehicleAggregateSensor(
@@ -654,17 +654,7 @@ class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
             if self._attr_native_unit_of_measurement == "km/l":
                 num = _to_float(value)
                 if num and num > 0:
-                    # Normalize fuel economy to l/km.
-                    # Heuristic:
-                    # - values >= 2 are likely l/100km -> divide by 100
-                    # - values < 2 are likely km/l (or already l/km)
-                    #   * very small values (<0.6) are already plausible l/km
-                    #   * otherwise treat as km/l and invert
-                    if num >= 2:
-                        return round(num / 100, 3)
-                    if num < 0.6:
-                        return round(num, 3)
-                    return round(1 / num, 3)
+                    return round(100 / num, 2) if num < 50 else round(num, 2)
                 return None
             num = _to_float(value)
             return num if num is not None else value
@@ -1178,20 +1168,8 @@ class LubeLoggerLatestGasSensor(BaseLubeLoggerSensor):
 
         # Last fallback: compute from distance/liters when available
         if fuel_value_num is None:
-            distance = self._distance_from_refuel_record(self._record)
-            liters = _to_float(
-                _get_record_value(
-                    self._record,
-                    "liters",
-                    "Liters",
-                    "fuelAmount",
-                    "FuelAmount",
-                    "volume",
-                    "Volume",
-                    "litres",
-                    "Litres",
-                )
-            )
+            distance = _to_float(_get_record_value(self._record, "distance", "Distance", "tripDistance", "TripDistance"))
+            liters = _to_float(_get_record_value(self._record, "liters", "Liters", "fuelAmount", "FuelAmount", "volume", "Volume"))
             if liters and distance and liters > 0 and distance > 0:
                 # l/100km
                 fuel_value_num = (liters / distance) * 100
@@ -1214,27 +1192,6 @@ class LubeLoggerLatestGasSensor(BaseLubeLoggerSensor):
                 break
         
         return attrs
-
-    @staticmethod
-    def _distance_from_refuel_record(record: dict[str, Any]) -> float | None:
-        """Get trip distance for a fuel record from direct field or odometer delta."""
-        distance = _to_float(_get_record_value(record, "distance", "Distance", "tripDistance", "TripDistance"))
-        if distance is not None:
-            return distance
-
-        odometer = _to_float(_get_record_value(record, "odometer", "Odometer"))
-        previous = _to_float(
-            _get_record_value(
-                record,
-                "previousOdometer",
-                "PreviousOdometer",
-                "initialOdometer",
-                "InitialOdometer",
-            )
-        )
-        if odometer is not None and previous is not None:
-            return odometer - previous
-        return None
 
 
 class LubeLoggerNextReminderSensor(BaseLubeLoggerSensor):
