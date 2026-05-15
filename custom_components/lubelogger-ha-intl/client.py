@@ -69,6 +69,37 @@ def parse_date_string(date_str: str) -> datetime | None:
     return None
 
 
+
+
+def get_latest_record_sort_key(
+    rec: dict[str, Any],
+    date_fields: tuple[str, ...],
+) -> tuple[int, datetime, int]:
+    """Return a stable sort key for latest record selection.
+
+    Prefers records with a parseable date, then by that date, then by numeric ID.
+    """
+    for field in date_fields:
+        date_str = rec.get(field)
+        if date_str:
+            dt = parse_date_string(date_str)
+            if dt:
+                rec_id = rec.get("id") or rec.get("Id")
+                try:
+                    rec_id_int = int(rec_id) if rec_id is not None else 0
+                except (TypeError, ValueError):
+                    rec_id_int = 0
+                return (1, dt, rec_id_int)
+
+    rec_id = rec.get("id") or rec.get("Id")
+    try:
+        rec_id_int = int(rec_id) if rec_id is not None else 0
+    except (TypeError, ValueError):
+        rec_id_int = 0
+
+    return (0, datetime.min.replace(tzinfo=dt_util.UTC), rec_id_int)
+
+
 def calculate_reminder_priority(reminder: dict[str, Any]) -> tuple:
     """Calculate priority for reminder sorting.
     
@@ -175,18 +206,37 @@ class LubeLoggerClient:
             _LOGGER.debug("No odometer records found for vehicle %s", vehicle_id)
             return None
 
-        def sort_key(rec: dict[str, Any]) -> Any:
-            rec_id = rec.get("id") or rec.get("Id")
-            if rec_id:
-                try:
-                    return int(rec_id)
-                except (ValueError, TypeError):
-                    return rec_id
-            return 0
+        def odometer_value(rec: dict[str, Any]) -> float:
+            value = rec.get("odometer") or rec.get("Odometer")
+            if value is None:
+                return float("-inf")
+            if isinstance(value, (int, float)):
+                return float(value)
+            try:
+                return float(str(value).replace(",", "."))
+            except (TypeError, ValueError):
+                return float("-inf")
 
-        latest = sorted(records, key=sort_key)[-1]
+        latest = max(
+            records,
+            key=lambda rec: (
+                odometer_value(rec),
+                get_latest_record_sort_key(rec, ("date", "Date", "odometerDate", "OdometerDate")),
+            ),
+        )
         _LOGGER.debug("Latest odometer for vehicle %s: %s", vehicle_id, latest)
         return latest
+
+    async def async_get_odometer_records(
+        self, vehicle_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all odometer records for a vehicle."""
+        endpoint = f"{API_ODOMETER}?vehicleId={vehicle_id}" if vehicle_id else API_ODOMETER
+        records = await self._async_request(endpoint)
+        if not isinstance(records, list) or not records:
+            _LOGGER.debug("No odometer records found for vehicle %s", vehicle_id)
+            return []
+        return records
 
     async def async_get_next_plan(
         self, vehicle_id: int | None = None
@@ -222,22 +272,7 @@ class LubeLoggerClient:
             _LOGGER.debug("No tax records found for vehicle %s", vehicle_id)
             return None
 
-        def sort_key(rec: dict[str, Any]) -> Any:
-            date_str = rec.get("date") or rec.get("Date") or rec.get("taxDate")
-            if date_str:
-                dt = parse_date_string(date_str)
-                if dt:
-                    return dt
-            
-            rec_id = rec.get("id") or rec.get("Id")
-            if rec_id:
-                try:
-                    return int(rec_id)
-                except (ValueError, TypeError):
-                    return rec_id
-            return 0
-
-        sorted_records = sorted(records, key=sort_key)
+        sorted_records = sorted(records, key=lambda rec: get_latest_record_sort_key(rec, ("date", "Date", "taxDate")))
         latest = sorted_records[-1] if sorted_records else None
         _LOGGER.debug("Latest tax for vehicle %s: %s", vehicle_id, latest)
         return latest
@@ -252,22 +287,7 @@ class LubeLoggerClient:
             _LOGGER.debug("No service records found for vehicle %s", vehicle_id)
             return None
 
-        def sort_key(rec: dict[str, Any]) -> Any:
-            date_str = rec.get("date") or rec.get("Date") or rec.get("serviceDate")
-            if date_str:
-                dt = parse_date_string(date_str)
-                if dt:
-                    return dt
-            
-            rec_id = rec.get("id") or rec.get("Id")
-            if rec_id:
-                try:
-                    return int(rec_id)
-                except (ValueError, TypeError):
-                    return rec_id
-            return 0
-
-        sorted_records = sorted(records, key=sort_key)
+        sorted_records = sorted(records, key=lambda rec: get_latest_record_sort_key(rec, ("date", "Date", "serviceDate")))
         latest = sorted_records[-1] if sorted_records else None
         _LOGGER.debug("Latest service for vehicle %s: %s", vehicle_id, latest)
         return latest
@@ -282,22 +302,7 @@ class LubeLoggerClient:
             _LOGGER.debug("No repair records found for vehicle %s", vehicle_id)
             return None
 
-        def sort_key(rec: dict[str, Any]) -> Any:
-            date_str = rec.get("date") or rec.get("Date") or rec.get("repairDate")
-            if date_str:
-                dt = parse_date_string(date_str)
-                if dt:
-                    return dt
-            
-            rec_id = rec.get("id") or rec.get("Id")
-            if rec_id:
-                try:
-                    return int(rec_id)
-                except (ValueError, TypeError):
-                    return rec_id
-            return 0
-
-        sorted_records = sorted(records, key=sort_key)
+        sorted_records = sorted(records, key=lambda rec: get_latest_record_sort_key(rec, ("date", "Date", "repairDate")))
         latest = sorted_records[-1] if sorted_records else None
         _LOGGER.debug("Latest repair for vehicle %s: %s", vehicle_id, latest)
         return latest
@@ -312,22 +317,7 @@ class LubeLoggerClient:
             _LOGGER.debug("No upgrade records found for vehicle %s", vehicle_id)
             return None
 
-        def sort_key(rec: dict[str, Any]) -> Any:
-            date_str = rec.get("date") or rec.get("Date") or rec.get("upgradeDate")
-            if date_str:
-                dt = parse_date_string(date_str)
-                if dt:
-                    return dt
-            
-            rec_id = rec.get("id") or rec.get("Id")
-            if rec_id:
-                try:
-                    return int(rec_id)
-                except (ValueError, TypeError):
-                    return rec_id
-            return 0
-
-        sorted_records = sorted(records, key=sort_key)
+        sorted_records = sorted(records, key=lambda rec: get_latest_record_sort_key(rec, ("date", "Date", "upgradeDate")))
         latest = sorted_records[-1] if sorted_records else None
         _LOGGER.debug("Latest upgrade for vehicle %s: %s", vehicle_id, latest)
         return latest
@@ -342,22 +332,7 @@ class LubeLoggerClient:
             _LOGGER.debug("No supply records found for vehicle %s", vehicle_id)
             return None
 
-        def sort_key(rec: dict[str, Any]) -> Any:
-            date_str = rec.get("date") or rec.get("Date") or rec.get("supplyDate")
-            if date_str:
-                dt = parse_date_string(date_str)
-                if dt:
-                    return dt
-            
-            rec_id = rec.get("id") or rec.get("Id")
-            if rec_id:
-                try:
-                    return int(rec_id)
-                except (ValueError, TypeError):
-                    return rec_id
-            return 0
-
-        sorted_records = sorted(records, key=sort_key)
+        sorted_records = sorted(records, key=lambda rec: get_latest_record_sort_key(rec, ("date", "Date", "supplyDate")))
         latest = sorted_records[-1] if sorted_records else None
         _LOGGER.debug("Latest supply for vehicle %s: %s", vehicle_id, latest)
         return latest
@@ -372,22 +347,7 @@ class LubeLoggerClient:
             _LOGGER.debug("No gas records found for vehicle %s", vehicle_id)
             return None
 
-        def sort_key(rec: dict[str, Any]) -> Any:
-            date_str = rec.get("date") or rec.get("Date") or rec.get("fuelDate") or rec.get("FuelDate")
-            if date_str:
-                dt = parse_date_string(date_str)
-                if dt:
-                    return dt
-            
-            rec_id = rec.get("id") or rec.get("Id")
-            if rec_id:
-                try:
-                    return int(rec_id)
-                except (ValueError, TypeError):
-                    return rec_id
-            return 0
-
-        sorted_records = sorted(records, key=sort_key)
+        sorted_records = sorted(records, key=lambda rec: get_latest_record_sort_key(rec, ("date", "Date", "fuelDate", "FuelDate")))
         latest = sorted_records[-1] if sorted_records else None
         _LOGGER.debug("Latest gas for vehicle %s: %s", vehicle_id, latest)
         return latest
@@ -432,22 +392,7 @@ class LubeLoggerClient:
             _LOGGER.debug("No equipment records found for vehicle %s", vehicle_id)
             return None
 
-        def sort_key(rec: dict[str, Any]) -> Any:
-            date_str = rec.get("date") or rec.get("Date") or rec.get("equipmentDate")
-            if date_str:
-                dt = parse_date_string(date_str)
-                if dt:
-                    return dt
-
-            rec_id = rec.get("id") or rec.get("Id")
-            if rec_id:
-                try:
-                    return int(rec_id)
-                except (ValueError, TypeError):
-                    return rec_id
-            return 0
-
-        sorted_records = sorted(records, key=sort_key)
+        sorted_records = sorted(records, key=lambda rec: get_latest_record_sort_key(rec, ("date", "Date", "equipmentDate", "EquipmentDate")))
         latest = sorted_records[-1] if sorted_records else None
 
         _LOGGER.debug("Latest equipment for vehicle %s: %s", vehicle_id, latest)
