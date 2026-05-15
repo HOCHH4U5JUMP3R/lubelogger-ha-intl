@@ -651,7 +651,7 @@ class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
                 if total_distance > 0 and total_fuel > 0:
                     # This sensor is normalized to km/l below.
                     value = round((total_fuel / total_distance) * 100, 2)
-            if self._attr_native_unit_of_measurement == "l/km":
+            if self._attr_native_unit_of_measurement == "km/l":
                 num = _to_float(value)
                 if num and num > 0:
                     # Normalize fuel economy to l/km.
