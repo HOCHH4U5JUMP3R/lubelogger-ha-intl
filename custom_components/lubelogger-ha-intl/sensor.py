@@ -242,10 +242,23 @@ async def async_setup_entry(
             )
 
         equipment_list = vehicle.get("equipment_records", [])
+        equipment_name_counts: dict[str, int] = {}
 
         for equipment in equipment_list:
+            base_name = (
+                equipment.get("description")
+                or equipment.get("Description")
+                or equipment.get("name")
+                or equipment.get("Name")
+                or f"Equipment {equipment.get('id') or equipment.get('Id') or 'unknown'}"
+            )
+            count = equipment_name_counts.get(base_name, 0) + 1
+            equipment_name_counts[base_name] = count
+            display_name = f"{base_name} {count}" if count > 1 else base_name
             sensors.append(
-                LubeLoggerEquipmentSensor(coordinator, vehicle_id, vehicle_name, vehicle_info, equipment,)
+                LubeLoggerEquipmentSensor(
+                    coordinator, vehicle_id, vehicle_name, vehicle_info, equipment, display_name
+                )
             )
 
     async_add_entities(sensors)
@@ -455,6 +468,14 @@ class LubeLoggerLatestOdometerSensor(BaseLubeLoggerSensor):
                     attrs["date_formatted"] = dt.strftime("%d/%m/%Y")
             except (ValueError, TypeError):
                 pass
+
+        # Include complete odometer history for HA post-hoc history alignment
+        data = self.coordinator.data or {}
+        vehicles = data.get("vehicles", [])
+        for vehicle in vehicles:
+            if vehicle.get("id") == self._vehicle_id:
+                attrs["odometer_history"] = vehicle.get("odometer_records") or []
+                break
         
         return attrs
 
@@ -1352,13 +1373,14 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
         vehicle_name: str,
         vehicle_info: dict,
         equipment: dict[str, Any],
+        display_name: str,
     ) -> None:
         super().__init__(coordinator)
 
         self._vehicle_id = vehicle_id
         self._equipment = equipment
         self._equipment_id = equipment.get("id") or equipment.get("Id")
-        equipment_name = equipment.get("description") or equipment.get("Description") or equipment.get("name") or equipment.get("Name") or f"Equipment {self._equipment_id}"
+        equipment_name = display_name
 
         self._attr_unique_id = f"lubelogger_equipment_{vehicle_id}_{self._equipment_id}"
         self._attr_translation_key = "equipment_item"
@@ -1376,8 +1398,15 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> str | None:
-        return self._equipment.get("description") or self._equipment.get("Description") or self._equipment.get("name") or self._equipment.get("Name")
+    def native_value(self) -> bool | None:
+        value = self._equipment.get("isactive")
+        if value is None:
+            value = self._equipment.get("IsActive")
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ("true", "1", "yes")
+        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

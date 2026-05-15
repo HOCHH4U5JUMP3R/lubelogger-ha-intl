@@ -227,6 +227,17 @@ class LubeLoggerClient:
         _LOGGER.debug("Latest odometer for vehicle %s: %s", vehicle_id, latest)
         return latest
 
+    async def async_get_odometer_records(
+        self, vehicle_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all odometer records for a vehicle."""
+        endpoint = f"{API_ODOMETER}?vehicleId={vehicle_id}" if vehicle_id else API_ODOMETER
+        records = await self._async_request(endpoint)
+        if not isinstance(records, list) or not records:
+            _LOGGER.debug("No odometer records found for vehicle %s", vehicle_id)
+            return []
+        return records
+
     async def async_get_next_plan(
         self, vehicle_id: int | None = None
     ) -> dict[str, Any] | None:
