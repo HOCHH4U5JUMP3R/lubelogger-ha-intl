@@ -1260,7 +1260,7 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
             return None
 
         # Try common date fields (same pattern as others)
-        for field in ("date", "Date", "EquipmentDate"):
+        for field in ("date", "Date", "equipmentDate", "EquipmentDate"):
             dt = parse_date(rec.get(field))
             if dt:
                 return dt
@@ -1281,7 +1281,7 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
                 attrs[key] = value
 
         # Add formatted date
-        for field in ("date", "Date", "EquipmentDate"):
+        for field in ("date", "Date", "equipmentDate", "EquipmentDate"):
             if field in attrs:
                 try:
                     dt = parse_date(attrs[field])
@@ -1358,7 +1358,7 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
         self._vehicle_id = vehicle_id
         self._equipment = equipment
         self._equipment_id = equipment.get("id") or equipment.get("Id")
-        equipment_name = equipment.get("name") or equipment.get("Name") or f"Equipment {self._equipment_id}"
+        equipment_name = equipment.get("description") or equipment.get("Description") or equipment.get("name") or equipment.get("Name") or f"Equipment {self._equipment_id}"
 
         self._attr_unique_id = f"lubelogger_equipment_{vehicle_id}_{self._equipment_id}"
         self._attr_translation_key = "equipment_item"
@@ -1377,7 +1377,7 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self) -> str | None:
-        return self._equipment.get("name") or self._equipment.get("Name")
+        return self._equipment.get("description") or self._equipment.get("Description") or self._equipment.get("name") or self._equipment.get("Name")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
