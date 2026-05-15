@@ -302,6 +302,35 @@ async def async_setup_entry(
             sensors.append(
                 LubeLoggerLatestGasSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
             )
+            sensors.extend(
+                [
+                    LubeLoggerVehicleAggregateSensor(
+                        coordinator, vehicle_id, vehicle_name, vehicle_info,
+                        "Total Distance", "total_distance", "km",
+                        ("totalDistance", "TotalDistance", "distanceTotal", "DistanceTotal", "odometer"),
+                    ),
+                    LubeLoggerVehicleAggregateSensor(
+                        coordinator, vehicle_id, vehicle_name, vehicle_info,
+                        "Total Fuel", "total_fuel", "L",
+                        ("totalFuel", "TotalFuel", "fuelTotal", "FuelTotal", "totalLiters", "TotalLiters"),
+                    ),
+                    LubeLoggerVehicleAggregateSensor(
+                        coordinator, vehicle_id, vehicle_name, vehicle_info,
+                        "Total Fuel Cost", "total_fuel_cost", "EUR",
+                        ("totalFuelCost", "TotalFuelCost", "fuelCostTotal", "FuelCostTotal"),
+                    ),
+                    LubeLoggerVehicleAggregateSensor(
+                        coordinator, vehicle_id, vehicle_name, vehicle_info,
+                        "Total Average Fuel Economy", "total_average_fuel_economy", "km/l",
+                        ("averageFuelEconomy", "AverageFuelEconomy", "avgFuelEconomy", "AvgFuelEconomy", "averageConsumption", "AverageConsumption"),
+                    ),
+                    LubeLoggerVehicleAggregateSensor(
+                        coordinator, vehicle_id, vehicle_name, vehicle_info,
+                        "Total Service Cost", "total_service_cost", "EUR",
+                        ("totalServiceCost", "TotalServiceCost", "maintenanceCostTotal", "MaintenanceCostTotal"),
+                    ),
+                ]
+            )
         if vehicle.get("next_reminder"):
             sensors.append(
                 LubeLoggerNextReminderSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
@@ -480,6 +509,64 @@ class BaseLubeLoggerSensor(CoordinatorEntity, SensorEntity):
             translated = self._translate_value(translation_key, value)
         
         return translated
+
+
+class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
+    """Generic vehicle aggregate metric sensor."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: LubeLoggerDataUpdateCoordinator,
+        vehicle_id: int,
+        vehicle_name: str,
+        vehicle_info: dict,
+        name: str,
+        unique_suffix: str,
+        unit: str,
+        keys: tuple[str, ...],
+    ) -> None:
+        super().__init__(coordinator)
+        self._vehicle_id = vehicle_id
+        self._keys = keys
+        self._attr_name = name
+        self._attr_unique_id = f"lubelogger_{vehicle_id}_{unique_suffix}"
+        self._attr_native_unit_of_measurement = unit
+        make = vehicle_info.get("Make") or vehicle_info.get("make") or ""
+        model = vehicle_info.get("Model") or vehicle_info.get("model") or ""
+        year = str(vehicle_info.get("Year") or vehicle_info.get("year") or "")
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, str(vehicle_id))},
+            name=vehicle_name,
+            manufacturer=make or "LubeLogger",
+            model=model or vehicle_name,
+            sw_version=year,
+        )
+
+    @property
+    def native_value(self) -> Any:
+        data = self.coordinator.data or {}
+        for vehicle in data.get("vehicles", []):
+            if vehicle.get("id") != self._vehicle_id:
+                continue
+            source = vehicle.get("vehicle_info") or {}
+            value = _get_record_value(source, *self._keys)
+            if value in (None, ""):
+                # Fallback to latest_gas extra fields
+                latest_gas = vehicle.get("latest_gas") or {}
+                for key in self._keys:
+                    value = _get_extra_field_value(latest_gas, key)
+                    if value not in (None, ""):
+                        break
+            if self._attr_native_unit_of_measurement == "km/l":
+                num = _to_float(value)
+                if num and num > 0:
+                    return round(100 / num, 2) if num < 50 else round(num, 2)
+                return None
+            num = _to_float(value)
+            return num if num is not None else value
+        return None
 
 
 class LubeLoggerLatestOdometerSensor(BaseLubeLoggerSensor):
@@ -959,6 +1046,10 @@ class LubeLoggerLatestGasSensor(BaseLubeLoggerSensor):
             fuel_raw = _get_extra_field_value(self._record, "fuelEconomy")
         if fuel_raw in (None, ""):
             fuel_raw = _get_extra_field_value(self._record, "averageConsumption")
+        if fuel_raw in (None, ""):
+            fuel_raw = _get_extra_field_value(self._record, "Fuel Economy")
+        if fuel_raw in (None, ""):
+            fuel_raw = _get_extra_field_value(self._record, "Average Consumption")
 
         fuel_value_num = _to_float(fuel_raw)
 
