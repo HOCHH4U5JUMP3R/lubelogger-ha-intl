@@ -560,6 +560,22 @@ class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
                     value = _get_extra_field_value(latest_gas, key)
                     if value not in (None, ""):
                         break
+            if (
+                value in (None, "")
+                and self._attr_unique_id.endswith("_total_distance")
+            ):
+                # Fallback for Lubelogger "sum-distance": sum distance values
+                # from all odometer records (same behavior as UI aggregate header).
+                total_distance = 0.0
+                found_distance = False
+                for record in vehicle.get("odometer_records") or []:
+                    distance_value = _get_record_value(record, "distance", "Distance")
+                    distance_num = _to_float(distance_value)
+                    if distance_num is not None:
+                        total_distance += distance_num
+                        found_distance = True
+                if found_distance:
+                    value = round(total_distance)
             if self._attr_native_unit_of_measurement == "km/l":
                 num = _to_float(value)
                 if num and num > 0:
@@ -631,14 +647,6 @@ class LubeLoggerLatestOdometerSensor(BaseLubeLoggerSensor):
             except (ValueError, TypeError):
                 pass
 
-        # Include complete odometer history for HA post-hoc history alignment
-        data = self.coordinator.data or {}
-        vehicles = data.get("vehicles", [])
-        for vehicle in vehicles:
-            if vehicle.get("id") == self._vehicle_id:
-                attrs["odometer_history"] = vehicle.get("odometer_records") or []
-                break
-        
         return attrs
 
 
