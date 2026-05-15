@@ -586,6 +586,71 @@ class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
                         "No usable distance values found in odometer records for vehicle %s",
                         self._vehicle_id,
                     )
+            if (
+                value in (None, "")
+                and self._attr_unique_id.endswith("_total_fuel")
+            ):
+                total_fuel = 0.0
+                found = False
+                for record in vehicle.get("gas_records") or []:
+                    liters = _to_float(
+                        _get_record_value(record, "liters", "Liters", "fuelConsumed", "FuelConsumed")
+                    )
+                    if liters is not None:
+                        total_fuel += liters
+                        found = True
+                if found:
+                    value = round(total_fuel, 2)
+            if (
+                value in (None, "")
+                and self._attr_unique_id.endswith("_total_fuel_cost")
+            ):
+                total_cost = 0.0
+                found = False
+                for record in vehicle.get("gas_records") or []:
+                    cost = _to_float(
+                        _get_record_value(record, "cost", "Cost", "totalCost", "TotalCost", "fuelCost")
+                    )
+                    if cost is not None:
+                        total_cost += cost
+                        found = True
+                if found:
+                    value = round(total_cost, 2)
+            if (
+                value in (None, "")
+                and self._attr_unique_id.endswith("_total_service_cost")
+            ):
+                total_service_cost = 0.0
+                found = False
+                for list_key in ("service_records", "repair_records", "upgrade_records", "supply_records"):
+                    for record in vehicle.get(list_key) or []:
+                        cost = _to_float(
+                            _get_record_value(record, "cost", "Cost", "totalCost", "TotalCost", "price", "Price")
+                        )
+                        if cost is not None:
+                            total_service_cost += cost
+                            found = True
+                if found:
+                    value = round(total_service_cost, 2)
+            if (
+                value in (None, "")
+                and self._attr_unique_id.endswith("_total_average_fuel_economy")
+            ):
+                total_distance = 0.0
+                total_fuel = 0.0
+                for record in vehicle.get("odometer_records") or []:
+                    distance_num = self._get_distance_from_odometer_record(record)
+                    if distance_num is not None and distance_num > 0:
+                        total_distance += distance_num
+                for record in vehicle.get("gas_records") or []:
+                    liters = _to_float(
+                        _get_record_value(record, "liters", "Liters", "fuelConsumed", "FuelConsumed")
+                    )
+                    if liters is not None and liters > 0:
+                        total_fuel += liters
+                if total_distance > 0 and total_fuel > 0:
+                    # This sensor is normalized to km/l below.
+                    value = round((total_fuel / total_distance) * 100, 2)
             if self._attr_native_unit_of_measurement == "km/l":
                 num = _to_float(value)
                 if num and num > 0:

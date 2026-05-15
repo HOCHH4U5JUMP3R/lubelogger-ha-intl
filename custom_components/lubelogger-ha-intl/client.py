@@ -253,6 +253,61 @@ class LubeLoggerClient:
             return []
         return records
 
+    async def async_get_gas_records(
+        self, vehicle_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all gas records for a vehicle."""
+        endpoint = f"{API_GAS_RECORD}?vehicleId={vehicle_id}" if vehicle_id else API_GAS_RECORD
+        records = await self._async_request(endpoint)
+        if not isinstance(records, list) or not records:
+            _LOGGER.debug("No gas records found for vehicle %s", vehicle_id)
+            return []
+        return records
+
+    async def async_get_service_records(
+        self, vehicle_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all service records for a vehicle."""
+        endpoint = f"{API_SERVICE_RECORD}?vehicleId={vehicle_id}" if vehicle_id else API_SERVICE_RECORD
+        records = await self._async_request(endpoint)
+        if not isinstance(records, list) or not records:
+            _LOGGER.debug("No service records found for vehicle %s", vehicle_id)
+            return []
+        return records
+
+    async def async_get_repair_records(
+        self, vehicle_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all repair records for a vehicle."""
+        endpoint = f"{API_REPAIR_RECORD}?vehicleId={vehicle_id}" if vehicle_id else API_REPAIR_RECORD
+        records = await self._async_request(endpoint)
+        if not isinstance(records, list) or not records:
+            _LOGGER.debug("No repair records found for vehicle %s", vehicle_id)
+            return []
+        return records
+
+    async def async_get_upgrade_records(
+        self, vehicle_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all upgrade records for a vehicle."""
+        endpoint = f"{API_UPGRADE_RECORD}?vehicleId={vehicle_id}" if vehicle_id else API_UPGRADE_RECORD
+        records = await self._async_request(endpoint)
+        if not isinstance(records, list) or not records:
+            _LOGGER.debug("No upgrade records found for vehicle %s", vehicle_id)
+            return []
+        return records
+
+    async def async_get_supply_records(
+        self, vehicle_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all supply records for a vehicle."""
+        endpoint = f"{API_SUPPLY_RECORD}?vehicleId={vehicle_id}" if vehicle_id else API_SUPPLY_RECORD
+        records = await self._async_request(endpoint)
+        if not isinstance(records, list) or not records:
+            _LOGGER.debug("No supply records found for vehicle %s", vehicle_id)
+            return []
+        return records
+
     async def async_get_next_plan(
         self, vehicle_id: int | None = None
     ) -> dict[str, Any] | None:
