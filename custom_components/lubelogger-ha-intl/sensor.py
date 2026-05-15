@@ -45,6 +45,8 @@ def parse_date(date_str: str | None) -> datetime | None:
 
     # US and EU date and time format
     formats = [
+        "%d.%m.%Y",           # EU dotted format: "18.03.2026"
+        "%d.%m.%Y %H:%M:%S",  # EU dotted format with time
         "%d/%m/%Y",           # EU format: "28/02/2027"
         "%d/%m/%Y %H:%M:%S",  # EU format with time
         "%m/%d/%Y",           # US format (fallback)

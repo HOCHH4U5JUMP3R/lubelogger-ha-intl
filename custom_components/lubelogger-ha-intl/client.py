@@ -46,6 +46,8 @@ def parse_date_string(date_str: str) -> datetime | None:
 
     # Try European formats first, then US formats
     formats = [
+        "%d.%m.%Y",           # European dotted format
+        "%d.%m.%Y %H:%M:%S",  # European dotted with time
         "%d/%m/%Y",           # European format: "28/02/2027"
         "%d/%m/%Y %H:%M:%S",  # European with time
         "%m/%d/%Y",           # US format: "12/17/2025"
