@@ -234,6 +234,23 @@ def convert_fuel_consumption(value: Any) -> float | str:
     return round(num_value, 2)
 
 
+def _to_float(value: Any) -> float | None:
+    """Best-effort float conversion for numeric-like values."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        converted = convert_number_string(value)
+        if isinstance(converted, (int, float)):
+            return float(converted)
+        try:
+            return float(value.replace(",", "."))
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -935,47 +952,28 @@ class LubeLoggerLatestGasSensor(BaseLubeLoggerSensor):
                 attrs[key] = convert_number_string(value)
             else:
                 attrs[key] = value
-        
-        # FUEL CONSUMPTION - EXPLICIT CONVERSION for fuelEconomy
-        if "fuelEconomy" in attrs:
-            fuel_value = attrs["fuelEconomy"]
-            
-            # If it's a string with comma, convert to float
-            if isinstance(fuel_value, str):
-                fuel_value = fuel_value.replace(',', '.')
-                try:
-                    fuel_value = float(fuel_value)
-                except (ValueError, TypeError):
-                    pass
-            
-            # If it's a number, convert to km/l and round
-            if isinstance(fuel_value, (int, float)) and fuel_value > 0:
-                # Conversion l/100km → km/l (100 / consumption)
-                fuel_value = 100 / fuel_value
-                fuel_value = round(fuel_value, 2)  # Round to 2 decimals
-            
-            attrs["fuelEconomy"] = fuel_value
+
+        # Resolve fuel economy robustly from direct fields, variants, ExtraFields, or fallback calculation
+        fuel_raw = _get_record_value(self._record, "fuelEconomy", "FuelEconomy", "averageConsumption", "AverageConsumption")
+        if fuel_raw in (None, ""):
+            fuel_raw = _get_extra_field_value(self._record, "fuelEconomy")
+        if fuel_raw in (None, ""):
+            fuel_raw = _get_extra_field_value(self._record, "averageConsumption")
+
+        fuel_value_num = _to_float(fuel_raw)
+
+        # Last fallback: compute from distance/liters when available
+        if fuel_value_num is None:
+            distance = _to_float(_get_record_value(self._record, "distance", "Distance", "tripDistance", "TripDistance"))
+            liters = _to_float(_get_record_value(self._record, "liters", "Liters", "fuelAmount", "FuelAmount", "volume", "Volume"))
+            if liters and distance and liters > 0 and distance > 0:
+                # l/100km
+                fuel_value_num = (liters / distance) * 100
+
+        if fuel_value_num is not None and fuel_value_num > 0:
+            # normalize to km/l for HA attributes
+            attrs["fuelEconomy"] = round(100 / fuel_value_num, 2)
             attrs["fuelEconomy_unit"] = "km/l"
-        
-        # Handle other similar consumption fields
-        other_consumption_fields = ["consumption", "litersPer100km", "averageConsumption"]
-        for field in other_consumption_fields:
-            if field in attrs:
-                raw_value = attrs[field]
-                if isinstance(raw_value, str):
-                    raw_value = raw_value.replace(',', '.')
-                    try:
-                        raw_value = float(raw_value)
-                    except (ValueError, TypeError):
-                        pass
-                
-                if isinstance(raw_value, (int, float)) and raw_value > 0:
-                    if raw_value < 20:  # Probably l/100km
-                        raw_value = 100 / raw_value
-                    raw_value = round(raw_value, 2)
-                
-                attrs[field] = raw_value
-                attrs[f"{field}_unit"] = "km/l"
         
         # Add date in readable format
         date_fields = ["date", "Date", "FuelDate"]
