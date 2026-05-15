@@ -165,6 +165,28 @@ def _should_convert_numeric_string(value: Any) -> bool:
     return bool(re.fullmatch(r"[€$£]?\s*[-+]?\d[\d.,\s]*", text))
 
 
+def _get_record_value(record: dict[str, Any], *keys: str) -> Any:
+    """Get value by trying exact keys and then case-insensitive key matching."""
+    for key in keys:
+        if key in record:
+            return record.get(key)
+    lowered = {str(k).lower(): v for k, v in record.items()}
+    for key in keys:
+        value = lowered.get(key.lower())
+        if value is not None:
+            return value
+    return None
+
+
+def _get_record_datetime(record: dict[str, Any], fields: tuple[str, ...]) -> datetime | None:
+    """Return first parseable datetime from candidate fields."""
+    for field in fields:
+        dt = parse_date(_get_record_value(record, field))
+        if dt:
+            return dt
+    return None
+
+
 def convert_fuel_consumption(value: Any) -> float | str:
     """Convert fuel consumption from l/100km to km/l with 2 decimals."""
     if value is None or value == "":
@@ -649,12 +671,7 @@ class LubeLoggerLatestServiceSensor(BaseLubeLoggerSensor):
         rec = self._record
         if not rec:
             return None
-
-        for field in ("date", "Date", "ServiceDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "serviceDate", "ServiceDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -671,7 +688,7 @@ class LubeLoggerLatestServiceSensor(BaseLubeLoggerSensor):
                 attrs[key] = value
         
         # Add date in readable format
-        date_fields = ["date", "Date", "ServiceDate"]
+        date_fields = ["date", "Date", "serviceDate", "ServiceDate"]
         for field in date_fields:
             if field in attrs:
                 try:
@@ -712,11 +729,7 @@ class LubeLoggerLatestRepairSensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        for field in ("date", "Date", "RepairDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "repairDate", "RepairDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -733,7 +746,7 @@ class LubeLoggerLatestRepairSensor(BaseLubeLoggerSensor):
                 attrs[key] = value
         
         # Add date in readable format
-        date_fields = ["date", "Date", "RepairDate"]
+        date_fields = ["date", "Date", "repairDate", "RepairDate"]
         for field in date_fields:
             if field in attrs:
                 try:
@@ -774,11 +787,7 @@ class LubeLoggerLatestUpgradeSensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        for field in ("date", "Date", "UpgradeDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "upgradeDate", "UpgradeDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -795,7 +804,7 @@ class LubeLoggerLatestUpgradeSensor(BaseLubeLoggerSensor):
                 attrs[key] = value
         
         # Add date in readable format
-        date_fields = ["date", "Date", "UpgradeDate"]
+        date_fields = ["date", "Date", "upgradeDate", "UpgradeDate"]
         for field in date_fields:
             if field in attrs:
                 try:
@@ -836,11 +845,7 @@ class LubeLoggerLatestSupplySensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        for field in ("date", "Date", "SupplyDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "supplyDate", "SupplyDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -857,7 +862,7 @@ class LubeLoggerLatestSupplySensor(BaseLubeLoggerSensor):
                 attrs[key] = value
         
         # Add date in readable format
-        date_fields = ["date", "Date", "SupplyDate"]
+        date_fields = ["date", "Date", "supplyDate", "SupplyDate"]
         for field in date_fields:
             if field in attrs:
                 try:
@@ -898,11 +903,7 @@ class LubeLoggerLatestGasSensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        for field in ("date", "Date", "FuelDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "fuelDate", "FuelDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -1298,12 +1299,7 @@ class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
         if not rec:
             return None
 
-        # Try common date fields (same pattern as others)
-        for field in ("date", "Date", "equipmentDate", "EquipmentDate"):
-            dt = parse_date(rec.get(field))
-            if dt:
-                return dt
-        return None
+        return _get_record_datetime(rec, ("date", "Date", "equipmentDate", "EquipmentDate"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -1417,13 +1413,7 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self) -> bool | None:
-        value = self._equipment.get("isactive")
-        if value is None:
-            value = self._equipment.get("IsActive")
-        if value is None:
-            value = self._equipment.get("active")
-        if value is None:
-            value = self._equipment.get("Active")
+        value = _get_record_value(self._equipment, "isactive", "IsActive", "active", "Active")
 
         # Some payloads provide dynamic name/value pairs
         if value is None:
@@ -1433,9 +1423,15 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
                     for item in items:
                         if not isinstance(item, dict):
                             continue
-                        item_name = str(item.get("name") or item.get("Name") or "").strip().lower()
+                        item_name = str(
+                            item.get("name")
+                            or item.get("Name")
+                            or item.get("-name")
+                            or item.get("_name")
+                            or ""
+                        ).strip().lower()
                         if item_name == "active":
-                            value = item.get("value") or item.get("Value")
+                            value = item.get("value") or item.get("Value") or item.get("-value")
                             break
                     if value is not None:
                         break
