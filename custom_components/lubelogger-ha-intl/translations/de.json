@@ -1,0 +1,91 @@
+{
+  "title": "LubeLogger",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure LubeLogger",
+        "description": "Enter your API credentials",
+        "data": {
+          "url": "API URL",
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "Already configured"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "latest_odometer": {
+        "name": "Letzter Kilometerstand"
+      },
+      "latest_service": {
+        "name": "Letzter Service"
+      },
+      "latest_repair": {
+        "name": "Letzte Reparatur"
+      },
+      "latest_upgrade": {
+        "name": "Letztes Upgarde"
+      },
+      "latest_supply": {
+        "name": "Last Supply"
+      },
+      "latest_gas": {
+        "name": "Letzte Tankfüllung"
+      },
+      "latest_tax": {
+        "name": "Letzte Steuer"
+      },
+      "next_plan": {
+        "name": "Nächster Plan"
+      },
+      "next_reminder": {
+        "name": "Nächste Erinnerung"
+      },
+      "latest_equipment": {
+        "name": "Letztes Equipment"
+      },
+      "equipment_list": {
+        "name": "Equipment Entries"
+      },
+      "all_reminders": {
+        "name": "Elle Erinnerungen"
+      }
+    }
+  },
+  "state_attributes": {
+    "sensor": {
+      "next_reminder": {
+        "and_conjunction": " und ",
+        "urgency": {
+          "NotUrgent": "Nicht dringend",
+          "Urgent": "Dringend",
+          "PastDue": "Überfällig"
+        },
+        "reminder_type": {
+          "By time": "Nach Zeit",
+          "By distance": "Nach Strecke",
+          "Both": "Beides",
+          "Mixed": "Gemischt"
+        },
+        "status": {
+          "overdue_distance": "Überfällig seit {value} km",
+          "overdue_days": "Überfällig seit {value} Tag(en)",
+          "future_distance": "In {value} km",
+          "future_days": "In {value} Tag(en)",
+          "due_today": "Heute fällig",
+          "due_now": "Jetzt fällig",
+          "generic": "Unbekannter Status"
+        }
+      }
+    }
+  }
+}
