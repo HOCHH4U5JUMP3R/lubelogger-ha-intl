@@ -451,6 +451,24 @@ class LubeLoggerClient:
         
         return None
 
+    async def async_get_reminder_records(
+        self, vehicle_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all reminders for a vehicle."""
+        endpoint = f"{API_REMINDER}?vehicleId={vehicle_id}" if vehicle_id else API_REMINDER
+        records = await self._async_request(endpoint)
+
+        if not isinstance(records, list) or not records:
+            _LOGGER.debug("No reminder records found for vehicle %s", vehicle_id)
+            return []
+
+        valid_records = [record for record in records if isinstance(record, dict) and record]
+        if not valid_records:
+            _LOGGER.debug("No valid reminder records found for vehicle %s", vehicle_id)
+            return []
+
+        return sorted(valid_records, key=calculate_reminder_priority)
+
     async def async_get_latest_equipment(
         self, vehicle_id: int | None = None
     ) -> dict[str, Any] | None:

@@ -342,6 +342,10 @@ async def async_setup_entry(
             sensors.append(
                 LubeLoggerNextReminderSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
             )
+        if vehicle.get("reminder_records") is not None:
+            sensors.append(
+                LubeLoggerReminderListSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
+            )
         if vehicle.get("latest_equipment"):
             sensors.append(
                 LubeLoggerLatestEquipmentSensor(coordinator, vehicle_id, vehicle_name, vehicle_info)
@@ -1491,6 +1495,67 @@ class LubeLoggerNextReminderSensor(BaseLubeLoggerSensor):
                 attrs["status"] = template.replace("{value}", str(value))
         
         return attrs
+
+
+class LubeLoggerReminderListSensor(CoordinatorEntity, SensorEntity):
+    """Sensor that exposes all reminders for a vehicle."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "all_reminders"
+
+    def __init__(
+        self,
+        coordinator: LubeLoggerDataUpdateCoordinator,
+        vehicle_id: int,
+        vehicle_name: str,
+        vehicle_info: dict,
+    ) -> None:
+        super().__init__(coordinator)
+        self._vehicle_id = vehicle_id
+        self._attr_unique_id = f"lubelogger_{vehicle_id}_all_reminders"
+        make = vehicle_info.get("Make") or vehicle_info.get("make") or ""
+        model = vehicle_info.get("Model") or vehicle_info.get("model") or ""
+        year = str(vehicle_info.get("Year") or vehicle_info.get("year") or "")
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, str(vehicle_id))},
+            name=vehicle_name,
+            manufacturer=make or "LubeLogger",
+            model=model or vehicle_name,
+            sw_version=year,
+        )
+
+    @property
+    def _records(self) -> list[dict[str, Any]]:
+        data = self.coordinator.data or {}
+        for vehicle in data.get("vehicles", []):
+            if vehicle.get("id") == self._vehicle_id:
+                records = vehicle.get("reminder_records")
+                if isinstance(records, list):
+                    return [rec for rec in records if isinstance(rec, dict)]
+        return []
+
+    @property
+    def native_value(self) -> int:
+        """Return the number of reminders."""
+        return len(self._records)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose all reminders with converted numeric values."""
+        normalized_reminders = []
+        for reminder in self._records:
+            normalized = {}
+            for key, value in reminder.items():
+                if _should_convert_numeric_string(value):
+                    normalized[key] = convert_number_string(value)
+                else:
+                    normalized[key] = value
+            normalized_reminders.append(normalized)
+
+        return {
+            "count": len(normalized_reminders),
+            "reminders": normalized_reminders,
+        }
 
 class LubeLoggerLatestEquipmentSensor(BaseLubeLoggerSensor):
     """Sensor for latest equipment record."""
