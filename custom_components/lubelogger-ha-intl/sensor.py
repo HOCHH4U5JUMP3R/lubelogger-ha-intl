@@ -328,7 +328,7 @@ async def async_setup_entry(
                     ),
                     LubeLoggerVehicleAggregateSensor(
                         coordinator, vehicle_id, vehicle_name, vehicle_info,
-                        "Total Average Fuel Economy", "total_average_fuel_economy", "km/l",
+                        "Total Average Fuel Economy", "total_average_fuel_economy", "L/100km",
                         ("AverageFuelEconomy", "averageFuelEconomy", "avgFuelEconomy", "AvgFuelEconomy", "averageConsumption", "AverageConsumption"),
                     ),
                     LubeLoggerVehicleAggregateSensor(
@@ -651,10 +651,11 @@ class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
                 if total_distance > 0 and total_fuel > 0:
                     # This sensor is normalized to km/l below.
                     value = round((total_fuel / total_distance) * 100, 2)
-            if self._attr_native_unit_of_measurement == "km/l":
+            if self._attr_native_unit_of_measurement == "L/100km":
                 num = _to_float(value)
-                if num and num > 0:
-                    return round(100 / num, 2) if num < 50 else round(num, 2)
+                if num is not None and num > 0:
+                    # Normalize potential km/l values into L/100km.
+                    return round(100 / num, 2) if num > 30 else round(num, 2)
                 return None
             num = _to_float(value)
             return num if num is not None else value
@@ -1175,9 +1176,24 @@ class LubeLoggerLatestGasSensor(BaseLubeLoggerSensor):
                 fuel_value_num = (liters / distance) * 100
 
         if fuel_value_num is not None and fuel_value_num > 0:
-            # normalize to km/l for HA attributes
-            attrs["fuelEconomy"] = round(100 / fuel_value_num, 2)
-            attrs["fuelEconomy_unit"] = "km/l"
+            # Keep API value semantics as consumption (L/100km).
+            attrs["fuelEconomy"] = round(fuel_value_num, 2)
+            attrs["fuelEconomy_unit"] = "L/100km"
+
+        # Resolve price per liter (unit price) from direct fields or ExtraFields.
+        price_per_liter_raw = _get_record_value(
+            self._record,
+            "pricePerLiter", "PricePerLiter", "costPerLiter", "CostPerLiter",
+            "unitPrice", "UnitPrice", "price_per_liter", "fuelUnitCost",
+        )
+        if price_per_liter_raw in (None, ""):
+            for extra_name in ("pricePerLiter", "Price Per Liter", "costPerLiter", "Cost Per Liter", "unitPrice", "Unit Price"):
+                price_per_liter_raw = _get_extra_field_value(self._record, extra_name)
+                if price_per_liter_raw not in (None, ""):
+                    break
+        price_per_liter = _to_float(price_per_liter_raw)
+        if price_per_liter is not None:
+            attrs["pricePerLiter"] = round(price_per_liter, 3)
         
         # Add date in readable format
         date_fields = ["date", "Date", "FuelDate"]
