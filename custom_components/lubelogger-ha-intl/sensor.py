@@ -328,7 +328,7 @@ async def async_setup_entry(
                     ),
                     LubeLoggerVehicleAggregateSensor(
                         coordinator, vehicle_id, vehicle_name, vehicle_info,
-                        "Total Average Fuel Economy", "total_average_fuel_economy", "km/l",
+                        "Total Average Fuel Economy", "total_average_fuel_economy", "L/100km",
                         ("AverageFuelEconomy", "averageFuelEconomy", "avgFuelEconomy", "AvgFuelEconomy", "averageConsumption", "AverageConsumption"),
                     ),
                     LubeLoggerVehicleAggregateSensor(
@@ -651,10 +651,11 @@ class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
                 if total_distance > 0 and total_fuel > 0:
                     # This sensor is normalized to km/l below.
                     value = round((total_fuel / total_distance) * 100, 2)
-            if self._attr_native_unit_of_measurement == "km/l":
+            if self._attr_native_unit_of_measurement == "L/100km":
                 num = _to_float(value)
-                if num and num > 0:
-                    return round(100 / num, 2) if num < 50 else round(num, 2)
+                if num is not None and num > 0:
+                    # Normalize potential km/l values into L/100km.
+                    return round(100 / num, 2) if num > 30 else round(num, 2)
                 return None
             num = _to_float(value)
             return num if num is not None else value
