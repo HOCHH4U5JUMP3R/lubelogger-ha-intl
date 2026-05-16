@@ -55,6 +55,9 @@
       },
       "equipment_list": {
         "name": "Equipment Entries"
+      },
+      "all_reminders": {
+        "name": "All reminders"
       }
     }
   },

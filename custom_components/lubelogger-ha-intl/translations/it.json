@@ -55,6 +55,9 @@
       },
       "equipment_list": {
         "name": "Voci attrezzatura"
+      },
+      "all_reminders": {
+        "name": "Tutti i promemoria"
       }
     }
   },
