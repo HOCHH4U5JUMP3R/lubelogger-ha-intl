@@ -1702,11 +1702,22 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> bool | None:
-        value = _get_record_value(self._equipment, "isactive", "IsActive", "active", "Active")
+    def native_value(self) -> float | int | None:
+        value = _get_record_value(
+            self._equipment,
+            "DistanceTraveled",
+            "distanceTraveled",
+            "distance_traveled",
+            "Distance",
+            "distance",
+        )
 
         if value is None:
-            value = _get_extra_field_value(self._equipment, "Active")
+            value = _get_extra_field_value(self._equipment, "DistanceTraveled")
+        if value is None:
+            value = _get_extra_field_value(self._equipment, "Distance Traveled")
+        if value is None:
+            value = _get_extra_field_value(self._equipment, "Distance")
 
         # Some payloads provide single key/value with name metadata
         if value is None:
@@ -1717,7 +1728,7 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
                 or self._equipment.get("_name")
                 or ""
             ).strip().lower()
-            if item_name == "active":
+            if item_name in ("distancetraveled", "distance traveled", "distance"):
                 value = (
                     self._equipment.get("value")
                     or self._equipment.get("Value")
@@ -1739,19 +1750,16 @@ class LubeLoggerEquipmentSensor(CoordinatorEntity, SensorEntity):
                             or item.get("_name")
                             or ""
                         ).strip().lower()
-                        if item_name == "active":
+                        if item_name in ("distancetraveled", "distance traveled", "distance"):
                             value = item.get("value") or item.get("Value") or item.get("-value")
                             break
                     if value is not None:
                         break
 
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, (int, float)):
-            return bool(value)
-        if isinstance(value, str):
-            return value.strip().lower() in ("true", "1", "yes", "on")
-        return None
+        numeric_value = convert_number_string(value)
+        if isinstance(numeric_value, (int, float)):
+            return numeric_value
+        return _to_float(value)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
