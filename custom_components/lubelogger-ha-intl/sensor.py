@@ -626,7 +626,7 @@ class LubeLoggerVehicleAggregateSensor(CoordinatorEntity, SensorEntity):
             ):
                 total_service_cost = 0.0
                 found = False
-                for list_key in ("service_records", "repair_records", "upgrade_records", "supply_records"):
+                for list_key in ("service_records", "repair_records", "upgrade_records"):
                     for record in vehicle.get(list_key) or []:
                         cost = _to_float(
                             _get_record_value(record, "cost", "Cost", "totalCost", "TotalCost", "price", "Price")
