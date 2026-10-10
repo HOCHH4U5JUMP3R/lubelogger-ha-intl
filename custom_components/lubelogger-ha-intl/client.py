@@ -197,8 +197,34 @@ class LubeLoggerClient:
             return None
         endpoint = f"{API_VEHICLE_INFO}?vehicleId={vehicle_id}"
         info = await self._async_request(endpoint)
+
+        # LubeLogger's /api/vehicle/info endpoint returns a list of VehicleInfo
+        # objects, even when vehicleId is supplied. Older/custom API versions
+        # may return a single object, so support both response shapes.
         if isinstance(info, dict):
             return info
+        if isinstance(info, list):
+            if not info:
+                return None
+
+            requested_id = str(vehicle_id)
+            for item in info:
+                if not isinstance(item, dict):
+                    continue
+                vehicle_data = item.get("VehicleData") or item.get("vehicleData") or {}
+                returned_id = vehicle_data.get("Id") or vehicle_data.get("id")
+                if returned_id is not None and str(returned_id) == requested_id:
+                    return item
+
+            # The API normally returns one entry for a vehicle-scoped request.
+            if len(info) == 1 and isinstance(info[0], dict):
+                return info[0]
+
+        _LOGGER.warning(
+            "Unexpected vehicle info response for vehicle %s: %s",
+            vehicle_id,
+            type(info).__name__,
+        )
         return None
 
     async def async_get_latest_odometer(
